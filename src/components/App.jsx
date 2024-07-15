@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { fetchSearch } from '../search-api';
 import toast, { Toaster } from 'react-hot-toast';
 import SimpleLightbox from 'simplelightbox';
@@ -15,7 +15,7 @@ export const App = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
   const [isEnd, setIsEnd] = useState(false);
-  let lightbox;
+  const lightboxRef = useRef(null);
 
   useEffect(() => {
     if (search === '') return;
@@ -27,15 +27,15 @@ export const App = () => {
 
   useEffect(() => {
     if (images.length > 0) {
-      lightbox = new SimpleLightbox('.gallery a', {
+      lightboxRef.current = new SimpleLightbox('.gallery a', {
         captionsData: 'alt',
         captionDelay: 250,
       });
     }
 
     return () => {
-      if (lightbox) {
-        lightbox.destroy();
+      if (lightboxRef.current) {
+        lightboxRef.current.destroy();
       }
     };
   }, [images]);
