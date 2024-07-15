@@ -1,7 +1,6 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { fetchSearch } from '../search-api';
 import toast, { Toaster } from 'react-hot-toast';
-
 import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
 import Searchbar from './Searchbar/Searchbar';
@@ -9,38 +8,42 @@ import LoadMore from './LoadMore/LoadMore';
 import Load from './Loader/Load';
 import ImageGallery from './ImageGallery/ImageGallery';
 
-export class App extends Component {
-  state = {
-    search: '',
-    page: 1,
-    images: [],
-    isLoading: false,
-    isError: false,
-    isEnd: false,
-  };
+export const App = () => {
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [images, setImages] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isError, setIsError] = useState(false);
+  const [isEnd, setIsEnd] = useState(false);
+  let lightbox;
 
-  componentDidUpdate = async (_prevProps, prevState) => {
-    const { search, page } = this.state;
+  useEffect(() => {
+    if (search === '') return;
 
-    if (prevState.search !== search || prevState.page !== page) {
-      await this.fetchImages(search, page);
+    (async () => {
+      await fetchImages(search, page);
+    })();
+  }, [search, page]);
+
+  useEffect(() => {
+    if (images.length > 0) {
+      lightbox = new SimpleLightbox('.gallery a', {
+        captionsData: 'alt',
+        captionDelay: 250,
+      });
     }
-    if (prevState.images !== this.state.images) {
-      this.initializeLightbox();
-    }
-  };
 
-  componentWillUnmount() {
-    if (this.lightbox) {
-      this.lightbox.destroy();
-    }
-  }
+    return () => {
+      if (lightbox) {
+        lightbox.destroy();
+      }
+    };
+  }, [images]);
 
-  fetchImages = async (search, page) => {
+  const fetchImages = async (search, page) => {
     try {
-      this.setState({ isLoading: true });
+      setIsLoading(true);
       const fetchedImages = await fetchSearch(search, page);
-
       const { hits, totalHits } = fetchedImages;
 
       if (hits.length === 0) {
@@ -49,37 +52,24 @@ export class App extends Component {
       }
 
       if (page === 1) {
-        toast.success(`Found ${totalHits} search result`);
+        toast.success(`Found ${totalHits} related search result`);
       }
 
       if (page * 12 >= totalHits) {
-        this.setState({ isEnd: true });
+        setIsEnd(true);
         toast.error('You reach the end of search result');
       }
 
-      this.setState(prevState => ({
-        images: [...prevState.images, ...hits],
-      }));
+      setImages(prevState => [...prevState, ...hits]);
       console.log(hits, totalHits);
     } catch {
-      this.setState({ isError: true });
+      setIsError(true);
     } finally {
-      this.setState({ isLoading: false });
+      setIsLoading(false);
     }
   };
 
-  initializeLightbox = () => {
-    if (this.lightbox) {
-      this.lightbox.destroy();
-    }
-    this.lightbox = new SimpleLightbox('.gallery a', {
-      captionsData: 'alt',
-      captionDelay: 250,
-    });
-  };
-
-  handleSubmit = query => {
-    const { search } = this.state;
+  const handleSubmit = query => {
     const newSearch = query.trim().toLowerCase();
 
     if (newSearch === '') {
@@ -93,35 +83,32 @@ export class App extends Component {
     }
 
     if (newSearch !== search) {
-      this.setState({ search: newSearch, page: 1, images: [] });
+      setSearch(newSearch);
+      setPage(1);
+      setImages([]);
     }
   };
 
-  handleClick = () => {
-    if (!this.state.isEnd) {
-      this.setState(prevState => ({ page: prevState.page + 1 }));
+  const handleClick = () => {
+    if (!isEnd) {
+      setPage(prevState => prevState + 1);
     } else {
       toast.error("You've reached the end of the search results");
     }
   };
-  render() {
-    const { images, isLoading, isError, isEnd } = this.state;
-    return (
-      <div>
-        <Searchbar onSubmit={this.handleSubmit} />
 
-        <ImageGallery photos={images} />
+  return (
+    <div>
+      <Searchbar onSubmit={handleSubmit} />
 
-        {images.length >= 1 && !isEnd && (
-          <LoadMore onClick={this.handleClick} />
-        )}
-        {isError &&
-          toast.error('Oops, something went wrong! Reload this page!')}
+      <ImageGallery photos={images} />
 
-        {isLoading && <Load />}
+      {images.length >= 1 && !isEnd && <LoadMore onClick={handleClick} />}
+      {isError && toast.error('Oops, something went wrong! Reload this page!')}
 
-        <Toaster position="top-right" reverseOrder={false} />
-      </div>
-    );
-  }
-}
+      {isLoading && <Load />}
+
+      <Toaster position="top-right" reverseOrder={false} />
+    </div>
+  );
+};
